@@ -33,39 +33,19 @@ jobs:
       - name: 🦊 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0'
+          flutter-version: '3.19.6'
           channel: 'stable'
           cache: true
 
-      - name: 📦 Cache Pub Dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pub-cache
-            .dart_tool
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
-
-      - name: 🔧 Fix pubspec.yaml jika perlu
-        run: |
-          if [ -f "pubspec.yaml" ]; then
-            # Tambahkan dependencies minimal jika tidak ada
-            if ! grep -q "flutter:" pubspec.yaml; then
-              echo "flutter:" >> pubspec.yaml
-              echo "  sdk: flutter" >> pubspec.yaml
-            fi
-          fi
-
       - name: 📦 Get dependencies
-        run: flutter pub get || flutter pub get --no-example
+        run: flutter pub get
 
       - name: 🔨 Build APK
         run: |
           if [ "${{ github.event.inputs.build_mode }}" == "debug" ]; then
-            flutter build apk --debug || flutter build apk --debug --no-tree-shake-icons
+            flutter build apk --debug
           else
-            flutter build apk --release || flutter build apk --release --no-tree-shake-icons
+            flutter build apk --release
           fi
 
       - name: 📤 Upload APK
