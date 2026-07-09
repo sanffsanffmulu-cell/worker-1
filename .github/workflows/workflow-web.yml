@@ -15,19 +15,11 @@ on:
         description: 'URL Website (contoh: https://example.com)'
         required: true
         default: 'https://example.com'
-      icon_type:
-        description: 'Icon (default/custom)'
-        required: true
-        default: 'default'
-        type: choice
-        options:
-          - default
-          - custom
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     
     steps:
       - name: ☕ Setup Java
@@ -58,52 +50,26 @@ jobs:
           <!DOCTYPE html>
           <html>
           <head>
-              <meta http-equiv="refresh" content="0; url=${{ github.event.inputs.website_url }}" />
+              <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
               <title>${{ github.event.inputs.app_name }}</title>
           </head>
           <body>
-              <p>Loading...</p>
+              <h3>Loading...</h3>
+              <script>
+                  window.location.href = "${{ github.event.inputs.website_url }}";
+              </script>
           </body>
           </html>
           EOF
 
       - name: 🎨 Buat Icon Default
-        if: github.event.inputs.icon_type == 'default'
         run: |
           cd webapp
           sudo apt-get update && sudo apt-get install -y imagemagick
-          convert -size 512x512 gradient:blue-darkviolet -fill white -gravity center \
-            -font Arial -pointsize 80 -annotate +0-20 "WEB" \
-            -font Arial -pointsize 30 -annotate +0+40 "APP" \
+          convert -size 512x512 xc:blue -fill white -gravity center \
+            -font Arial -pointsize 80 -annotate 0 "WEB" \
             www/icon.png
-          
-          cp www/icon.png www/icon-512.png
-          convert www/icon.png -resize 192x192 www/icon-192.png
-          convert www/icon.png -resize 144x144 www/icon-144.png
-          convert www/icon.png -resize 96x96 www/icon-96.png
-          convert www/icon.png -resize 72x72 www/icon-72.png
-          convert www/icon.png -resize 48x48 www/icon-48.png
-
-      - name: 🎨 Custom Icon
-        if: github.event.inputs.icon_type == 'custom'
-        run: |
-          cd webapp
-          if [ -f "../assets/icon.png" ]; then
-            cp ../assets/icon.png www/icon.png
-            cp ../assets/icon.png www/icon-512.png
-            convert www/icon.png -resize 192x192 www/icon-192.png
-            convert www/icon.png -resize 144x144 www/icon-144.png
-            convert www/icon.png -resize 96x96 www/icon-96.png
-            convert www/icon.png -resize 72x72 www/icon-72.png
-            convert www/icon.png -resize 48x48 www/icon-48.png
-          else
-            sudo apt-get update && sudo apt-get install -y imagemagick
-            convert -size 512x512 gradient:blue-darkviolet -fill white -gravity center \
-              -font Arial -pointsize 80 -annotate +0-20 "WEB" \
-              -font Arial -pointsize 30 -annotate +0+40 "APP" \
-              www/icon.png
-          fi
 
       - name: 📱 Add Android Platform
         run: |
@@ -113,7 +79,7 @@ jobs:
       - name: 🔨 Build APK
         run: |
           cd webapp
-          cordova build android --release || cordova build android
+          cordova build android --release
 
       - name: 📤 Upload APK
         uses: actions/upload-artifact@v4
