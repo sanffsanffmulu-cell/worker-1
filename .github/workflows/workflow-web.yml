@@ -1,0 +1,122 @@
+name: Build Web to APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'Nama Aplikasi'
+        required: true
+        default: 'MyWebApp'
+      app_package:
+        description: 'Package ID (contoh: com.example.app)'
+        required: true
+        default: 'com.example.mywebapp'
+      website_url:
+        description: 'URL Website (contoh: https://example.com)'
+        required: true
+        default: 'https://example.com'
+      icon_type:
+        description: 'Icon (default/custom)'
+        required: true
+        default: 'default'
+        type: choice
+        options:
+          - default
+          - custom
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    
+    steps:
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: 📱 Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: 📦 Install Cordova
+        run: npm install -g cordova
+
+      - name: 📁 Buat Project Cordova
+        run: |
+          cordova create webapp ${{ github.event.inputs.app_package }} "${{ github.event.inputs.app_name }}"
+          cd webapp
+          
+          rm -rf www
+          mkdir -p www
+          cat > www/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <meta http-equiv="refresh" content="0; url=${{ github.event.inputs.website_url }}" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>${{ github.event.inputs.app_name }}</title>
+          </head>
+          <body>
+              <p>Loading...</p>
+          </body>
+          </html>
+          EOF
+
+      - name: 🎨 Buat Icon Default
+        if: github.event.inputs.icon_type == 'default'
+        run: |
+          cd webapp
+          sudo apt-get update && sudo apt-get install -y imagemagick
+          convert -size 512x512 gradient:blue-darkviolet -fill white -gravity center \
+            -font Arial -pointsize 80 -annotate +0-20 "WEB" \
+            -font Arial -pointsize 30 -annotate +0+40 "APP" \
+            www/icon.png
+          
+          cp www/icon.png www/icon-512.png
+          convert www/icon.png -resize 192x192 www/icon-192.png
+          convert www/icon.png -resize 144x144 www/icon-144.png
+          convert www/icon.png -resize 96x96 www/icon-96.png
+          convert www/icon.png -resize 72x72 www/icon-72.png
+          convert www/icon.png -resize 48x48 www/icon-48.png
+
+      - name: 🎨 Custom Icon
+        if: github.event.inputs.icon_type == 'custom'
+        run: |
+          cd webapp
+          if [ -f "../assets/icon.png" ]; then
+            cp ../assets/icon.png www/icon.png
+            cp ../assets/icon.png www/icon-512.png
+            convert www/icon.png -resize 192x192 www/icon-192.png
+            convert www/icon.png -resize 144x144 www/icon-144.png
+            convert www/icon.png -resize 96x96 www/icon-96.png
+            convert www/icon.png -resize 72x72 www/icon-72.png
+            convert www/icon.png -resize 48x48 www/icon-48.png
+          else
+            sudo apt-get update && sudo apt-get install -y imagemagick
+            convert -size 512x512 gradient:blue-darkviolet -fill white -gravity center \
+              -font Arial -pointsize 80 -annotate +0-20 "WEB" \
+              -font Arial -pointsize 30 -annotate +0+40 "APP" \
+              www/icon.png
+          fi
+
+      - name: 📱 Add Android Platform
+        run: |
+          cd webapp
+          cordova platform add android --save
+
+      - name: 🔨 Build APK
+        run: |
+          cd webapp
+          cordova build android --release || cordova build android
+
+      - name: 📤 Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: webapp/platforms/android/app/build/outputs/apk/release/app-release.apk
