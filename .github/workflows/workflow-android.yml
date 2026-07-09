@@ -1,0 +1,76 @@
+name: Build Android Native APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_mode:
+        description: 'Mode Build (debug/release)'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - debug
+          - release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: 📱 Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm install || yarn install || echo "No package manager found"
+
+      - name: 🔧 Fix gradle wrapper
+        run: |
+          if [ -f "android/gradlew" ]; then
+            chmod +x android/gradlew
+          fi
+
+      - name: 🔨 Build APK
+        run: |
+          if [ -f "android/gradlew" ]; then
+            cd android
+            if [ "${{ github.event.inputs.build_mode }}" == "debug" ]; then
+              ./gradlew assembleDebug || ./gradlew assembleDebug --no-daemon
+            else
+              ./gradlew assembleRelease || ./gradlew assembleRelease --no-daemon
+            fi
+          else
+            echo "❌ Tidak ada folder android! Mencoba build dengan Cordova..."
+            npm install -g cordova
+            cordova create app com.example.app "App"
+            cd app
+            cordova platform add android
+            if [ "${{ github.event.inputs.build_mode }}" == "debug" ]; then
+              cordova build android --debug
+            else
+              cordova build android --release
+            fi
+          fi
+
+      - name: 📤 Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.inputs.build_mode == 'debug' && 'app-debug' || 'app-release' }}
+          path: |
+            android/app/build/outputs/apk/${{ github.event.inputs.build_mode == 'debug' && 'debug' || 'release' }}/app-${{ github.event.inputs.build_mode == 'debug' && 'debug' || 'release' }}.apk
+            app/platforms/android/app/build/outputs/apk/${{ github.event.inputs.build_mode == 'debug' && 'debug' || 'release' }}/app-${{ github.event.inputs.build_mode == 'debug' && 'debug' || 'release' }}.apk
